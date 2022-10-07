@@ -1,0 +1,8 @@
+{
+    "input_dim" : "3",
+    "output_dim" : "1",
+    "num_layers" : "8",
+    "num_neurons" : "40", 
+    "lower_bound" : ["0", "-2", "-2"],
+    "upper_bound" : ["5", "2", "2"]
+}

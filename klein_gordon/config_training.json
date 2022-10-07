@@ -1,0 +1,9 @@
+{
+    "epochs" : "40000",
+    "n_phys" : "2500", 
+    "optimizer" : "lbfgs",
+    "log_frequency": "100",
+    "validation_frequency": "100",
+    "w_data": "2.5",
+    "learning_rate": "0.01"
+}

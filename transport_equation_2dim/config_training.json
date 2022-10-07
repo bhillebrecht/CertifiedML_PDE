@@ -1,0 +1,8 @@
+{
+    "epochs" : "10000",
+    "n_phys" : "10000",
+    "optimizer" : "lbfgs",
+    "log_frequency": "100",
+    "validation_frequency": "100",
+    "w_data": "0.3"
+}

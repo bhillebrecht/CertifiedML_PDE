@@ -1,0 +1,8 @@
+{
+    "epochs" : "3000",
+    "n_phys" : "1000",
+    "optimizer" : "lbfgs",
+    "learning_rate" : "0.1",
+    "validation_frequency" : "1000",
+    "log_frequency" : "1000"
+}

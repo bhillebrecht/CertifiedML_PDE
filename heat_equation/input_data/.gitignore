@@ -1,0 +1,4 @@
+*.csv
+*.pdf
+/test_data/*.csv
+/test_data/*.pdf

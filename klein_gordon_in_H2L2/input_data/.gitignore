@@ -1,0 +1,3 @@
+*.csv
+*.pdf
+/reference_solution/*.csv
