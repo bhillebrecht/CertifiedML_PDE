@@ -1,0 +1,44 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "/schemas/config_training",
+    "type": "object",
+    "properties": {
+      "epochs": {
+        "description": "Number of epochs for the network to be trained on.",
+        "type": "integer"
+      },
+      "n_phys": {
+        "description": "Number of (potentially generated) points to enforce the fulfillment of the differential equation.",
+        "type": "integer"
+      },
+      "optimizer": {
+        "description": "Choice of optimizer.",
+        "type" : "string",
+        "enum" : ["adam", "lbfgs_tf_probability", "lbfgs"]
+      },
+      "log_frequency": {
+        "description": "Logging frequency for training.",
+        "type": "integer"
+      },
+      "validation_frequency": {
+        "description": "Validation frequency in training.",
+        "type": "integer"
+      },
+      "storage_frequency": {
+        "description": "Storage frequency of intermediate results.",
+        "type": "integer"
+      },
+      "learning_rate": {
+        "description": "Learning rate, relevant for adam optimizers and the first step of lbfgs.",
+        "type": "number"
+      },
+      "w_data": {
+        "description": "Weighting of the input data in comparison to the equation enforcement",
+        "type": "number"
+      }
+    },
+    "required": [
+      "epochs",
+      "n_phys"
+    ]
+  }

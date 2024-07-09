@@ -1,0 +1,53 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "/schemas/config_nn",
+    "type": "object",
+    "properties": {
+      "input_dim": {
+        "description": "Input dimension of the neural network (for time-dependent PINNs this is usually the state dimension plus 1).",
+        "type": "integer"
+      },
+      "output_dim": {
+        "description": "Output dimension of the neural network (for PINNs this is usually the state dimension).",
+        "type": "integer"
+      },
+      "num_layers": {
+        "description": "Number of hidden layers.",
+        "type": "integer"
+      },
+      "num_neurons": {
+        "description": "Number of neurons per hidden layer.",
+        "type": "integer"
+      },
+      "lower_bound": {
+        "description": "Lower bound for all input-dimensions. The array must have a length of input_dim.",
+        "type": "array",
+        "items": [
+          {
+            "type": "number"
+          }
+        ]
+      },
+      "upper_bound": {
+        "description": "Upper bound for all input-dimensions. The array must have a length of input_dim",
+        "type": "array",
+        "items": [
+          {
+            "type": "number"
+          }
+        ]
+      },
+      "res_net_skip_length": {
+        "description": "In case a residual neural network shall be built, the number of hidden layers to bypass shall be set here.",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "input_dim",
+      "output_dim",
+      "num_layers",
+      "num_neurons",
+      "lower_bound",
+      "upper_bound"
+    ]
+  }

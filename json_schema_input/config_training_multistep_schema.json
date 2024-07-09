@@ -1,0 +1,27 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "$id": "/schemas/config_training_multistep",
+    "type": "object",
+    "properties":{
+        "steps":{
+            "type":"array",
+            "items": {
+                "type":"object",
+                "properties" : {
+                    "step": {
+                        "description": "Identifier of step",
+                        "type": "integer"
+                    },
+                    "config": {
+                        "description": "Description of training step configuration",
+                        "$ref": "./config_training_schema.json"
+                    }
+                },
+                "required": [
+                    "step",
+                    "config"
+                ]
+            }
+        }
+    }
+}
