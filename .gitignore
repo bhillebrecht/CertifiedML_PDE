@@ -1,5 +1,6 @@
-/base/__pycache__/
-/helpers/__pycache__/
+base/__pycache__/
+helpers/__pycache__/
 
-/klein_gordon_in_H2L2/
-/transport_equation_2dim/
+klein_gordon_in_H2L2/
+transport_equation_2dim/
+heat_equation/
