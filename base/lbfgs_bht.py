@@ -1,5 +1,5 @@
 ###################################################################################################
-# Copyright (c) 2021 Jonas Nicodemus
+# Copyright (c) 2024 Birgit Hillebrecht
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,39 +20,14 @@
 # SOFTWARE.
 #
 ###################################################################################################
-#
-# This file incorporates work and modifications to the originally published code
-# according to the previous license by the following contributors under the following licenses
-#
-#   Copyright (c) 2022 Birgit Hillebrecht
-#
-#   Permission is hereby granted, free of charge, to any person obtaining a copy
-#   of this software and associated documentation files (the "Software"), to deal
-#   in the Software without restriction, including without limitation the rights
-#   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#   copies of the Software, and to permit persons to whom the Software is
-#   furnished to do so, subject to the following conditions:
-#
-#   The above copyright notice and this permission notice shall be included in all
-#   copies or substantial portions of the Software.
-# 
-#   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#   SOFTWARE.
-#
-###################################################################################################
+
 
 import numpy
 import tensorflow as tf
-from tensorflow_probability import optimizer
 import numpy as np
 
-from base.custom_lbfgs import lbfgs, Struct
-
+from base.custom_lbfgs_bht import lbfgs
+from base.lbfgs_state import State
 
 def function_factory(model, loss_fcn, x, y, callback_fcn, epochs, x_test=None, y_test=None,
                      val_freq=1000, log_freq=1000, store_freq=5000, verbose=1):
@@ -173,20 +148,13 @@ class LBFGS:
         # convert initial model parameters to a 1D tf.Tensor
         init_params = tf.dynamic_stitch(func.idx, model.trainable_variables)
 
-        optim_results = optimizer.lbfgs_minimize(
-            func, #    value_and_gradients_function,
-            init_params,    #initial_position,
-                #previous_optimizer_results=None,
-            num_correction_pairs=50,
-            tolerance=1e-14,
-                #x_tolerance=0,
-                #f_relative_tolerance=0,
-                #initial_inverse_hessian_estimate=None,
-            max_iterations = epochs    #max_iterations=50,
-                #parallel_iterations=1,
-                #stopping_condition=None,
-                #max_line_search_iterations=50,
-                #f_absolute_tolerance=0,
-                #name=None
-        )
-        return optim_results.position
+        nt_epochs = epochs
+        nt_config = Struct()
+        nt_config.learningRate = learning_rate
+        nt_config.maxIter = nt_epochs
+        nt_config.nCorrection = 50
+        nt_config.tolFun = 1.0 * np.finfo(float).eps
+
+        state = State()
+
+        lbfgs(func, init_params, nt_config, state)

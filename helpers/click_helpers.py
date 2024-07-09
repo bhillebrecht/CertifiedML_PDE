@@ -79,10 +79,12 @@ def run(ctx, ae, input_file, epsilon):
 
 @click_helper_select.command()
 @click.option('-lw', is_flag=True, help='Load weights from predefined path (output_data/weights). This can only be used if data has been stored previously. Default = false')
+@click.option('-lwp', type=click.STRING, help='If lw=True, the loading path of the data can be overwritten here')
 @click.option('-nsr',  default=False,  help='Avoid storing results, by default, neither weights nor result parameters are stored')
 @click.option('-i', '--input_file', required=False, type=click.STRING, help='Sets input file for training')
+@click.option('-s', '--step', default=-1, required=False, type=click.INT, help='If multi-step optimization is done with multiple optimization configurations, this selects the step.')
 @click.pass_context
-def train(ctx, lw, nsr, input_file):  
+def train(ctx, lw, lwp, nsr, input_file, step):  
     # set target
     appl_path, create_fn, load_fn, ptco, _, _ = get_target_utilities()
 
@@ -90,7 +92,7 @@ def train(ctx, lw, nsr, input_file):
     sr = not nsr
     
     # train pinn
-    train_pinn(create_fn, load_fn, input_file, lw, sr, appl_path, ptco)
+    train_pinn(create_fn, load_fn, input_file, lw, lwp, sr, step, appl_path, ptco)
 
 @click_helper_select.command()
 @click.option('--mu_factor', type=float, default=0.1, help='Sets the factor to multiply avg deviation of ODE with to smoothen upper limit on deviation.')

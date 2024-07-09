@@ -1,4 +1,0 @@
-*.csv
-*.pdf
-/timeseries_input_data/*.csv
-/timeseries_input_data/*.pdf

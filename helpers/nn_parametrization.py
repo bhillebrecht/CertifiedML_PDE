@@ -25,11 +25,25 @@
 ###################################################################################################
 
 import json
+import logging
 import numpy as np
 
-from helpers.globals import set_activation_function, set_learning_rate, set_log_frequency, set_optimizer, set_validation_frequency, set_w_adaptivity, set_w_adaptivity_factor, set_w_data
+from helpers.globals import set_activation_function, set_learning_rate, set_storage_frequency, set_log_frequency, set_optimizer, set_validation_frequency, set_w_adaptivity, set_w_adaptivity_factor, set_w_data
 
-def load_training_params(filepath):
+def get_current_config(filepath, step=-1):
+    with open(filepath, "r") as jsonfile:
+        data = json.load(jsonfile)
+        jsonfile.close()  
+    
+    returndata = data
+    if step != -1:
+        for dataentry in data:
+            if dataentry['step'] == step:
+                returndata = dataentry
+
+    return returndata
+
+def load_training_params(filepath, step=-1):
     """
     Loads parameters to configure the training from the json file provided via param filepath
 
@@ -38,34 +52,59 @@ def load_training_params(filepath):
     - n_phys: number of collocation points for the PINN
     """
 
-    with open(filepath, "r") as jsonfile:
-        data = json.load(jsonfile)
-        jsonfile.close()  
+    data = get_current_config(filepath, step)
+    epochs = 0
+    n_phys = 0
 
-    return int(data['epochs']), int(data['n_phys'])
+    try :
+        epochs = int(data['epochs'])
+    except :
+        logging.error("Cannot load epochs from configuration file: Either the configuration file is invalid or it is required to indicate the step (-s) option.")
+        exit(1)
+    if epochs <= 0:
+        logging.error("n_phys may not be negative.")
+        exit(1) 
 
-def load_and_store_optional_training_params(filepath):
+    try :
+        n_phys = int(data['n_phys'])
+    except :
+        logging.error("Cannot load n_phys from configuration file: Either the configuration file is invalid or it is required to indicate the step (-s) option.")
+        exit(1)
+    if n_phys <= 0:
+        logging.error("n_phys may not be negative.")
+        exit(1)
 
-    if has_param(filepath, "optimizer"):
-        set_optimizer(get_param_as_string(filepath, "optimizer"))
-
-    if has_param(filepath, "learning_rate"):
-        set_learning_rate(get_param_as_float(filepath, "learning_rate"))
-
-    if has_param(filepath, "validation_frequency"):
-        set_validation_frequency(get_param_as_int(filepath, "validation_frequency"))
+    return epochs, n_phys
     
-    if has_param(filepath, "log_frequency"):
-        set_log_frequency(get_param_as_int(filepath, "log_frequency"))
+def load_and_store_optional_training_params(filepath, step=-1):
 
-    if has_param(filepath, "w_data"):
-        set_w_data(get_param_as_float(filepath, "w_data"))
+    data = get_current_config(filepath, step)
 
-    if has_param(filepath, "w_adapt"):
-        set_w_adaptivity(get_param_as_boolean(filepath, "w_adapt"))
+    if has_param(data, "optimizer"):
+        set_optimizer(data["optimizer"])
 
-    if has_param(filepath, "w_adapt_alpha_init"):
-        set_w_adaptivity_factor(get_param_as_float(filepath, "w_adapt_alpha_init"))
+    if has_param(data, "learning_rate"):
+        set_learning_rate(data["learning_rate"])
+
+    if has_param(data, "validation_frequency"):
+        set_validation_frequency(data['validation_frequency'])
+    
+    if has_param(data, "log_frequency"):
+        set_log_frequency(data["log_frequency"])
+
+    if has_param(data, "storage_frequency"):
+        set_storage_frequency(data["storage_frequency"])
+    else: 
+        set_storage_frequency(0)
+
+    if has_param(data, "w_data"):
+        set_w_data(data["w_data"])
+
+    if has_param(data, "w_adapt"):
+        set_w_adaptivity(data["w_adapt"])
+
+    if has_param(data, "w_adapt_alpha_init"):
+        set_w_adaptivity_factor(data["w_adapt_alpha_init"])
     return
 
 def load_nn_params(filepath):
@@ -89,11 +128,12 @@ def load_nn_params(filepath):
     lb = np.array(data['lower_bound'])
     ub = np.array(data['upper_bound'])
 
-    return int(data['input_dim']), int(data['output_dim']), int(data['num_layers']), int(data['num_neurons']), lb.astype(np.float), ub.astype(np.float)
+    return int(data['input_dim']), int(data['output_dim']), int(data['num_layers']), int(data['num_neurons']), lb.astype(np.float64), ub.astype(np.float64)
 
-def load_and_store_optional_nn_params(filepath):
+def load_and_store_optional_nn_params(filepath, step=-1):
 
-    if has_param(filepath, "activation_function"):
+    data = get_current_config(filepath, step)
+    if has_param(data, "activation_function"):
         set_activation_function(get_param_as_string(filepath, "activation_function"))
     
     return
@@ -118,18 +158,13 @@ def load_ee_params(filepath):
 
     return float(data['K']), float(data['mu']), float(data['L_f']), float(data['delta_mean']), M
 
-def has_param(filepath, param_name):
+def has_param(data, param_name):
     """
     Checks if keyword param_name exists in json file
 
-    :param string filepath: path to json file
+    :param string data: config data struct
     :param string param_name: keyword used for parameter in json file.
     """
-    with open(filepath, "r") as jsonfile:
-        data = json.load(jsonfile)
-        jsonfile.close()
-
-
     try: 
         data[param_name] 
     except KeyError as e:

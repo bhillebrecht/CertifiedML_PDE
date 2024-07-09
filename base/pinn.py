@@ -89,10 +89,9 @@ class PINN(NN, metaclass=abc.ABCMeta):
             with tf.GradientTape() as tape:
                 y_pred = self.model(x)
                 loss = self.loss_object(y, y_pred)
-
-        gradients = tape.gradient(loss, self.model.trainable_variables)
+    
+        gradients = tape.gradient(loss, self.model.trainable_weights[0])
         self.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-
         return loss
 
     def theotherloss(self, x, y):
@@ -159,7 +158,6 @@ class PINN(NN, metaclass=abc.ABCMeta):
             L_space = tf.reduce_mean(tf.reduce_sum(tf.square(s_pred), axis=1))
             L = L + self.space_weight * L_space
 
-            
         return L
 
     def f_model(self, x):

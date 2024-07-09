@@ -25,13 +25,16 @@
 ###################################################################################################
 
 import os
+from datetime import datetime
+
+import logging
 
 from helpers.nn_parametrization import load_and_store_optional_nn_params, load_and_store_optional_training_params, load_training_params, load_nn_params
 from helpers.input_generator import generate_collocation_points
 from helpers.csv_helpers import export_csv, import_csv
-from helpers.globals import get_learning_rate, get_log_frequency, get_optimizer, get_prefix, get_validation_frequency
+from helpers.globals import get_learning_rate, get_log_frequency, set_storage_frequency, get_storage_frequency, get_optimizer, get_prefix, get_validation_frequency
 
-def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, STORE, appl_path, post_train_callout):
+def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, LOAD_WEIGHTS_PATH, STORE, step, appl_path, post_train_callout):
     """
     Basic function for training a PINN. 
 
@@ -44,9 +47,11 @@ def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, STORE, appl_path,
     :param function post_train_callout: callout to be called after training    
     """
 
+    print(step)
+
     # Load training parameters
-    epochs, N_phys = load_training_params(os.path.join(appl_path, 'config_training.json'))
-    load_and_store_optional_training_params(os.path.join(appl_path, 'config_training.json'))
+    epochs, N_phys = load_training_params(os.path.join(appl_path, 'config_training.json'), step)
+    load_and_store_optional_training_params(os.path.join(appl_path, 'config_training.json'), step)
 
     # Load NN parameters
     input_dim, output_dim, N_layer, N_neurons, lb, ub = load_nn_params(os.path.join(appl_path,'config_nn.json'))
@@ -59,25 +64,28 @@ def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, STORE, appl_path,
     pinn = create_fun([input_dim, *N_layer * [N_neurons], output_dim], lb, ub)
 
     # PINN parametrization by stored weights
-    weights_path = os.path.join(appl_path, 'output_data', get_prefix()+'weights')
+    if not LOAD_WEIGHTS:
+        if step != -1:
+            weights_path = os.path.join(appl_path, 'output_data', get_prefix()+'weights_step_'+str(step))
+        else: 
+            weights_path = os.path.join(appl_path, 'output_data', get_prefix()+'weights')
+    else: 
+        weights_path = LOAD_WEIGHTS_PATH
+        if not os.path.isdir(os.path.join(os.getcwd(), weights_path)):
+            logging.error("The given filepath for the weights (lwp) does not exist "+os.path.join(os.getcwd(), weights_path))
+            exit(1)
+    X_phys = generate_collocation_points(N_phys, lb, ub)
+
     if LOAD_WEIGHTS:
         pinn.load_weights(weights_path)
-        X_phys = import_csv(os.path.join(weights_path, "collocation_points.csv"))
-    else:
-        X_phys = generate_collocation_points(N_phys, lb, ub)
+        if os.path.isfile(os.path.join(weights_path, "collocation_points.csv")):
+            X_phys = import_csv(os.path.join(weights_path, "collocation_points.csv"))
+    pinn.set_collocation_points(X_phys)
 
     # PINN training
-    # Generate training data via LHS
-    pinn.set_collocation_points(X_phys)
     pinn.fit(X_data, Y_data, epochs, None, None, 
-        optimizer=get_optimizer(), learning_rate=get_learning_rate(), 
-        val_freq=get_validation_frequency(), log_freq=get_log_frequency())
-
-    # store weights
-    if STORE:
-        print("STORE")
-        pinn.save_weights(os.path.join(weights_path, 'easy_checkpoint'))
-        print(os.path.join(weights_path, 'easy_checkpoint'))
-        export_csv(X_phys, os.path.join(weights_path,"collocation_points.csv") ) 
+            optimizer=get_optimizer(), learning_rate=get_learning_rate(), 
+            val_freq=get_validation_frequency(), log_freq=get_log_frequency(), 
+            store_freq=get_storage_frequency())
 
     post_train_callout(pinn, os.path.join(appl_path, 'output_data'))

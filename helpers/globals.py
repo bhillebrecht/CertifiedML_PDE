@@ -39,6 +39,7 @@ OPTIMIZER = 'adam'
 LEARNING_RATE=0.1
 VALIDATION_FREQUENCY=1000
 LOG_FREQUENCY=1000
+STORAGE_FREQUENCY=1000
 W_DATA = 1.0
 W_ADAPTIVITY = False
 W_ADAPTIVITY_FACTOR = 0.0
@@ -109,6 +110,15 @@ def get_log_frequency() -> int:
 def set_log_frequency(f: int):
     global LOG_FREQUENCY
     LOG_FREQUENCY = f
+    return
+
+def get_storage_frequency() -> int:
+    global STORAGE_FREQUENCY
+    return STORAGE_FREQUENCY
+
+def set_storage_frequency(f: int):
+    global STORAGE_FREQUENCY
+    STORAGE_FREQUENCY = f
     return
 
 def get_learning_rate() -> float:

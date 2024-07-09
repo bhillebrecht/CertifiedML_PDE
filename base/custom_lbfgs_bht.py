@@ -1,5 +1,5 @@
 ###################################################################################################
-# Copyright (c) 2021 Jonas Nicodemus
+# Copyright (c) 2024 Birgit Hillebrecht
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,9 @@
 
 import tensorflow as tf
 import time
+import logging
+
+from lbfgs_state import State
 
 # Time tracking functions
 global_time_list = []
@@ -55,12 +58,6 @@ def last_time():
     else:
         return 0
 
-
-def dot(a, b):
-    """Dot product function since TensorFlow doesn't have one."""
-    return tf.reduce_sum(a * b)
-
-
 def verbose_func(s):
     print(s)
 
@@ -69,9 +66,8 @@ final_loss = None
 times = []
 
 
-def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
-    """port of lbfgs.lua, using TensorFlow eager mode.
-    """
+def lbfgs(opfunc, x, config, state::State):
+    # early exit, when no iteration shall be made
     if config.maxIter == 0:
         return
 
@@ -85,13 +81,6 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
     lineSearch = config.lineSearch
     lineSearchOpts = config.lineSearchOptions
     learningRate = config.learningRate or 1
-    isverbose = config.verbose or False
-
-    # verbose function
-    if isverbose:
-        verbose = verbose_func
-    else:
-        verbose = lambda x: None
 
     # evaluate initial f(x) and df/dx
     f, g = opfunc(x)
@@ -104,8 +93,17 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
     # check optimality of initial point
     tmp1 = tf.abs(g)
     if tf.reduce_sum(tmp1) <= tolFun:
-        verbose("optimality condition below tolFun")
+        logging.info("optimality condition below tolFun")
         return x, f_hist
+
+    # variables cached in state (for tracing)
+    d = state.d
+    t = state.t
+    old_dirs = state.old_dirs
+    old_stps = state.old_stps
+    Hdiag = state.Hdiag
+    g_old = state.g_old
+    f_old = state.f_old
 
     # optimize for a max of maxIter iterations
     nIter = 0
@@ -130,7 +128,7 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
             y = g - g_old
 
             s = d * t
-            ys = dot(y, s)
+            ys = tf.tensordot(y, s)
 
             if ys > 1e-10:
                 # updating memory
@@ -144,7 +142,7 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
                 old_stps.append(y)
 
                 # update scale of initial Hessian approximation
-                Hdiag = ys / dot(y, y)
+                Hdiag = ys / tf.tensordot(y, y)
 
             # compute the approximate (L-BFGS) inverse Hessian
             # multiplied by the gradient
@@ -153,7 +151,7 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
             # need to be accessed element-by-element, so don't re-type tensor:
             ro = [0] * nCorrection
             for i in range(k):
-                ro[i] = 1 / dot(old_stps[i], old_dirs[i])
+                ro[i] = 1 / tf.tensordot(old_stps[i], old_dirs[i])
 
             # iteration in L-BFGS loop collapsed to use just one buffer
             # need to be accessed element-by-element, so don't re-type tensor:
@@ -161,13 +159,13 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
 
             q = -g
             for i in range(k - 1, -1, -1):
-                al[i] = dot(old_dirs[i], q) * ro[i]
+                al[i] = tf.tensordot(old_dirs[i], q) * ro[i]
                 q = q - al[i] * old_stps[i]
 
             # multiply by initial Hessian
             r = q * Hdiag
             for i in range(k):
-                be_i = dot(old_stps[i], r) * ro[i]
+                be_i = tf.tensordot(old_stps[i], r) * ro[i]
                 r += (al[i] - be_i) * old_dirs[i]
 
             d = r
@@ -180,11 +178,11 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
         ## compute step length
         ############################################################
         # directional derivative
-        gtd = dot(g, d)
+        gtd = tf.tensordot(g, d)
 
         # check that progress can be made along that direction
         if gtd > -tolX:
-            verbose("Can not make progress along direction.")
+            logging.warning("Can not make progress along direction.")
             break
 
         # reset initial guess for step size
@@ -224,28 +222,28 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
 
         if currentFuncEval >= maxEval:
             # max nb of function evals
-            verbose('max nb of function evals')
+            logging.info('The maximum number of function evaluation is reached.')
             break
 
         tmp1 = tf.abs(g)
         if tf.reduce_sum(tmp1) <= tolFun:
             # check optimality
-            verbose('optimality condition below tolFun')
+            logging.info('Optimality condition below tolFun.')
             break
 
         tmp1 = tf.abs(d * t)
         if tf.reduce_sum(tmp1) <= tolX:
             # step size below tolX
-            verbose('step size below tolX')
+            logging.info('Step size below tolX')
             break
 
         if tf.abs(f - f_old) < tolX:
             # function value changing less than tolX
-            verbose('function value changing less than tolX' + str(tf.abs(f - f_old)))
+            logging.info('Function value changing less than tolX' + str(tf.abs(f - f_old)))
             break
 
-        if do_verbose:
-            log_fn(nIter, f.numpy(), True)
+        if logging.getLevelName() > logging.DEBUG:
+            logging.debug(nIter, f.numpy(), True)
             # print("Step %3d loss %6.5f msec %6.3f"%(nIter, f.numpy(), last_time()))
             record_time()
             times.append(last_time())
@@ -263,15 +261,3 @@ def lbfgs(opfunc, x, config, state, do_verbose, log_fn):
     state.f_old = f_old
 
     return x, f_hist, currentFuncEval
-
-
-# dummy/Struct gives Lua-like struct object with 0 defaults
-class dummy(object):
-    pass
-
-
-class Struct(dummy):
-    def __getattribute__(self, key):
-        if key == '__dict__':
-            return super(dummy, self).__getattribute__('__dict__')
-        return self.__dict__.get(key, 0)

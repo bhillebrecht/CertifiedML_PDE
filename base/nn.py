@@ -119,11 +119,11 @@ class NN(object, metaclass=abc.ABCMeta):
         self.w_data = 0
 
     def get_model(self, periodicity, lb, ub, bcs: BoundaryCondition, normalize=True):
-        res_net = False
+        res_net = True
         skip_param = 3
 
         # use the functional API 
-        inputlayer = layers.Input(self.input_dim, dtype='float64')
+        inputlayer = layers.Input((self.input_dim,), dtype='float64')
 
         if bcs is not None and periodicity is not None:
             logging.warning("Periodic bcs and enforced bcs were given. Ensure that this is a valid model.")
@@ -270,7 +270,7 @@ class NN(object, metaclass=abc.ABCMeta):
         return loss
 
     def fit(self, x, y, epochs=2000, x_test=None, y_test=None, optimizer='adam', learning_rate=0.1,
-            load_best_weights=False, val_freq=1000, log_freq=1000, verbose=1):
+            load_best_weights=False, val_freq=1000, log_freq=1000, store_freq=5000, verbose=1):
         """
         Performs the neural network training phase.
 
@@ -287,19 +287,18 @@ class NN(object, metaclass=abc.ABCMeta):
         x = self.tensor(x)
         y = self.tensor(y)
         
-
         self.start_time = time.time()
         self.prev_time = self.start_time
 
         if optimizer == 'adam':
-            self.train_adam(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, verbose)
+            self.train_adam(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, store_freq, verbose)
         elif optimizer == 'lbfgs':
-            self.train_lbfgs(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, verbose)
+            self.train_lbfgs(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, store_freq, verbose)
 
         if load_best_weights is True:
             self.load_weights()
 
-    def train_adam(self, x, y, epochs=2000, x_test=None, y_test=None, learning_rate=0.1, val_freq=1000, log_freq=1000,
+    def train_adam(self, x, y, epochs=2000, x_test=None, y_test=None, learning_rate=0.1, val_freq=1000, log_freq=1000, store_freq=5000,
                    verbose=1):
         """
         Performs the neural network training, using the adam optimizer.
@@ -322,11 +321,11 @@ class NN(object, metaclass=abc.ABCMeta):
             # Track progress
             epoch_loss.update_state(loss)  # Add current batch loss
 
-            self.epoch_callback(epoch, epoch_loss.result(), epochs, x_test, y_test, val_freq, log_freq,
+            self.epoch_callback(epoch, epoch_loss.result(), epochs, x_test, y_test, val_freq, log_freq, store_freq,
                                 verbose)
 
     def train_lbfgs(self, x, y, epochs=2000, x_test=None, y_test=None, learning_rate=1.0, val_freq=1000, log_freq=1000,
-                    verbose=1):
+                    store_freq=5000, verbose=1):
         """
         Performs the neural network training, using the L-BFGS optimizer.
 
@@ -344,7 +343,7 @@ class NN(object, metaclass=abc.ABCMeta):
         optimizer = LBFGS()
         optimizer.minimize(
             self.model, self.loss_object, x, y, self.epoch_callback, epochs, x_test=x_test, y_test=y_test,
-            val_freq=val_freq, log_freq=log_freq, verbose=verbose, learning_rate=learning_rate)
+            val_freq=val_freq, log_freq=log_freq, store_freq=store_freq, verbose=verbose, learning_rate=learning_rate)
 
     def predict(self, x):
         """
@@ -428,7 +427,7 @@ class NN(object, metaclass=abc.ABCMeta):
 
         return datetime.timedelta(seconds=int(time.time() - self.start_time))
 
-    def epoch_callback(self, epoch, epoch_loss, epochs, x_val=None, y_val=None, val_freq=1000, log_freq=1000,
+    def epoch_callback(self, epoch, epoch_loss, epochs, x_val=None, y_val=None, val_freq=1000, log_freq=1000, store_freq=5000,
                        verbose=1):
         """
         Callback function, which is called after each epoch, to produce proper training logging
@@ -446,18 +445,20 @@ class NN(object, metaclass=abc.ABCMeta):
         elapsed_time = self.get_elapsed_time()
         self.train_time_results[epoch] = elapsed_time
 
-        if epoch % val_freq == 0 or epoch == 1:
+        if epoch % val_freq == 0 or epoch % log_freq == 0 or epoch == 1:
             length = len(str(epochs))
 
             if epoch > val_freq:
                 rel_improv = 100*(1-epoch_loss/self.train_loss_results[epoch-val_freq])
+            elif epoch == val_freq:
+                rel_improv = 100*(1-epoch_loss/self.train_loss_results[1])
             else:
                 rel_improv = -1
                 
             log_str = f'\tEpoch: {str(epoch).zfill(length)}/{epochs},\t' \
                       f'Loss: {epoch_loss:.4e}, \t Rel.Improv [%]: {rel_improv:.2f}'
 
-            if x_val is not None and y_val is not None:
+            if (epoch % val_freq == 0 or epoch == 1 ) and (x_val is not None and y_val is not None):
                 [mean_squared_error, errors, Y_pred] = self.evaluate(x_val, y_val)
                 self.train_accuracy_results[epoch] = mean_squared_error
                 self.train_pred_results[epoch] = Y_pred
@@ -468,6 +469,11 @@ class NN(object, metaclass=abc.ABCMeta):
             if (epoch % log_freq == 0 or epoch == 1) and verbose == 1:
                 log_str += f',\t Elapsed time: {elapsed_time} (+{self.get_epoch_duration()})'
                 logging.info(log_str)
+
+            if epoch % store_freq == 0:
+                self.save_weights(os.path.join(self.checkpoints_dir, "epoch_"+str(epoch), 'easy_checkpoint'))            
+                logging.info(f'Store current weights')
+
 
         if epoch == epochs and x_val is None and y_val is None:
             self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint'))
