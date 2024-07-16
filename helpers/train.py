@@ -47,11 +47,9 @@ def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, LOAD_WEIGHTS_PATH
     :param function post_train_callout: callout to be called after training    
     """
 
-    print(step)
-
     # Load training parameters
     epochs, N_phys = load_training_params(os.path.join(appl_path, 'config_training.json'), step)
-    load_and_store_optional_training_params(os.path.join(appl_path, 'config_training.json'), step)
+    problem_specifics = load_and_store_optional_training_params(os.path.join(appl_path, 'config_training.json'), step)
 
     # Load NN parameters
     input_dim, output_dim, N_layer, N_neurons, lb, ub = load_nn_params(os.path.join(appl_path,'config_nn.json'))
@@ -61,25 +59,27 @@ def train_pinn(create_fun, load_fun, load_param, LOAD_WEIGHTS, LOAD_WEIGHTS_PATH
     _, X_data, Y_data = load_fun(load_param)
     
     # PINN initialization
-    pinn = create_fun([input_dim, *N_layer * [N_neurons], output_dim], lb, ub)
+    pinn = create_fun([input_dim, *N_layer * [N_neurons], output_dim], lb, ub, problem_specifics)
 
     # PINN parametrization by stored weights
+    X_phys = generate_collocation_points(N_phys, lb, ub)
+
     if not LOAD_WEIGHTS:
         if step != -1:
             weights_path = os.path.join(appl_path, 'output_data', get_prefix()+'weights_step_'+str(step))
         else: 
             weights_path = os.path.join(appl_path, 'output_data', get_prefix()+'weights')
+
     else: 
         weights_path = LOAD_WEIGHTS_PATH
-        if not os.path.isdir(os.path.join(os.getcwd(), weights_path)):
+        if not os.path.isfile(os.path.join(os.getcwd(), weights_path)):
             logging.error("The given filepath for the weights (lwp) does not exist "+os.path.join(os.getcwd(), weights_path))
             exit(1)
-    X_phys = generate_collocation_points(N_phys, lb, ub)
 
-    if LOAD_WEIGHTS:
-        pinn.load_weights(weights_path)
-        if os.path.isfile(os.path.join(weights_path, "collocation_points.csv")):
-            X_phys = import_csv(os.path.join(weights_path, "collocation_points.csv"))
+        pinn.load_weights(os.path.join(os.getcwd(), weights_path))
+        if os.path.isfile(os.path.join(os.getcwd(), weights_path,"..", "collocation_points.csv")):
+            X_phys = import_csv(os.path.join(os.getcwd(), weights_path, "..", "collocation_points.csv"))
+   
     pinn.set_collocation_points(X_phys)
 
     # PINN training

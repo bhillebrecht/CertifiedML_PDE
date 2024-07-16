@@ -1,36 +1,8 @@
-###################################################################################################
-# Copyright (c) 2024 Birgit Hillebrecht
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-#
-###################################################################################################
-
-
 import numpy
 import tensorflow as tf
-import numpy as np
-
-from base.custom_lbfgs_bht import lbfgs
-from base.lbfgs_state import State
 
 def function_factory(model, loss_fcn, x, y, callback_fcn, epochs, x_test=None, y_test=None,
-                     val_freq=1000, log_freq=1000, store_freq=5000, verbose=1):
+                     val_freq=1000, log_freq=1000, store_freq=5000, verbose=1, calls_per_iter=1):
     """
     A factory to create a function required by the L-BFGS implementation.
 
@@ -104,8 +76,9 @@ def function_factory(model, loss_fcn, x, y, callback_fcn, epochs, x_test=None, y
         loss_value, grads = train_step(weights)
 
         # print out iteration & loss
-        f.iter += 1
-        callback_fcn(f.iter, loss_value, epochs, x_test, y_test, val_freq=val_freq, log_freq=log_freq, store_freq = store_freq, verbose=verbose)
+        f.iter += 1/calls_per_iter
+        if abs(f.iter - round(f.iter)) < 1e-7:
+            callback_fcn(round(f.iter), loss_value, epochs, x_test, y_test, val_freq=val_freq, log_freq=log_freq, store_freq = store_freq, verbose=verbose)
 
         # store loss value so we can retrieve later
         tf.py_function(f.history.append, inp=[loss_value], Tout=[])
@@ -122,39 +95,3 @@ def function_factory(model, loss_fcn, x, y, callback_fcn, epochs, x_test=None, y
 
     return f
 
-
-class LBFGS:
-    """
-    Class used to represent the L-BFGS optimizer.
-    """
-
-    def minimize(self, model, loss_fcn, x, y, callback_fcn, epochs=2000, learning_rate=1.,
-                 x_test=None, y_test=None, val_freq=1000, log_freq=1000, store_freq=5000, verbose=1):
-        """
-        Performs the Neural Network training with the L-BFGS implementation.
-
-        :param tf.keras.Model model: an instance of `tf.keras.Model` or its subclasses
-        :param object loss_fcn: a function with signature loss_value = loss(y_pred, y_true)
-        :param tf.tensor x: input tensor of the training dataset
-        :param tf.tensor y: output tensor of the training dataset
-        :param object callback_fcn: callback function, which is called after each epoch
-        :param int epochs: number of epochs
-        :param tf.tensor x_test: input tensor of the test dataset, used to evaluate accuracy
-        :param tf.tensor y_test: output tensor of the test dataset, used to evaluate accuracy
-        """
-        func = function_factory(model, loss_fcn, x, y, callback_fcn, epochs, x_test=x_test, y_test=y_test,
-                                val_freq=val_freq, log_freq=log_freq, store_freq=store_freq, verbose=verbose)
-
-        # convert initial model parameters to a 1D tf.Tensor
-        init_params = tf.dynamic_stitch(func.idx, model.trainable_variables)
-
-        nt_epochs = epochs
-        nt_config = Struct()
-        nt_config.learningRate = learning_rate
-        nt_config.maxIter = nt_epochs
-        nt_config.nCorrection = 50
-        nt_config.tolFun = 1.0 * np.finfo(float).eps
-
-        state = State()
-
-        lbfgs(func, init_params, nt_config, state)

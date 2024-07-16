@@ -35,6 +35,27 @@
       "w_data": {
         "description": "Weighting of the input data in comparison to the equation enforcement",
         "type": "number"
+      },
+      "problem_specifics":{
+        "description": "Problem specific information. This can be used to e.g. set collocation points",
+        "type":"array",
+        "items": {
+          "type": "object",
+          "properties":{
+            "name": {
+              "description": "Name of setting",
+              "type": "string"
+            },
+            "value": {
+              "description": "Value of setting given as string",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name", 
+            "value"
+          ]
+        }
       }
     },
     "required": [

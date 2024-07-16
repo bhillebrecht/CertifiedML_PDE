@@ -40,6 +40,7 @@ LEARNING_RATE=0.1
 VALIDATION_FREQUENCY=1000
 LOG_FREQUENCY=1000
 STORAGE_FREQUENCY=1000
+RES_NET_SKIP_LENGTH = 0
 W_DATA = 1.0
 W_ADAPTIVITY = False
 W_ADAPTIVITY_FACTOR = 0.0
@@ -77,6 +78,14 @@ def set_activation_function(af) -> None:
         logging.error("The activation function given \'" + af + "\' is invalid. Value must be either tanh, silu, gelu, relu or softmax")
         sys.exit()
 
+def set_res_net_skip_length(skip_length) -> None:
+    global RES_NET_SKIP_LENGTH
+    RES_NET_SKIP_LENGTH = skip_length
+
+def get_res_net_skip_length() :
+    global RES_NET_SKIP_LENGTH
+    return RES_NET_SKIP_LENGTH
+
 def set_optimizer(o) -> None:
     """
     Sets optimizer for next NN.
@@ -84,8 +93,8 @@ def set_optimizer(o) -> None:
     :param string o: optimizer by string, supported are lbfgs and adam
     """
     global OPTIMIZER
-    if not (o == 'lbfgs') and not (o =='adam'):
-        logging.error("The optimizer chosen is not supported: \'"+o+"\'. Valid values are lbfgs and adam.")
+    if not (o == 'lbfgs') and not (o =='adam') and not (o == 'lbfgs_tf_probability'):
+        logging.error("The optimizer chosen is not supported: \'"+o+"\'. Valid values are lbfgs, lbfgs_tf_probability and adam.")
         sys.exit()
 
     OPTIMIZER = o

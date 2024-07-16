@@ -28,7 +28,7 @@ import json
 import logging
 import numpy as np
 
-from helpers.globals import set_activation_function, set_learning_rate, set_storage_frequency, set_log_frequency, set_optimizer, set_validation_frequency, set_w_adaptivity, set_w_adaptivity_factor, set_w_data
+from helpers.globals import set_activation_function, set_learning_rate, set_res_net_skip_length, set_storage_frequency, set_log_frequency, set_optimizer, set_validation_frequency, set_w_adaptivity, set_w_adaptivity_factor, set_w_data
 
 def get_current_config(filepath, step=-1):
     with open(filepath, "r") as jsonfile:
@@ -36,10 +36,13 @@ def get_current_config(filepath, step=-1):
         jsonfile.close()  
     
     returndata = data
+
     if step != -1:
+        data = data['steps']
         for dataentry in data:
             if dataentry['step'] == step:
-                returndata = dataentry
+                returndata = dataentry['config']
+                return returndata
 
     return returndata
 
@@ -105,7 +108,13 @@ def load_and_store_optional_training_params(filepath, step=-1):
 
     if has_param(data, "w_adapt_alpha_init"):
         set_w_adaptivity_factor(data["w_adapt_alpha_init"])
-    return
+    
+    problem_specifics = dict()
+    if has_param(data, "problem_specifics"):
+        for dataentry in data["problem_specifics"]:
+            problem_specifics[dataentry["name"]] = dataentry["value"]
+
+    return problem_specifics
 
 def load_nn_params(filepath):
     """
@@ -135,6 +144,9 @@ def load_and_store_optional_nn_params(filepath, step=-1):
     data = get_current_config(filepath, step)
     if has_param(data, "activation_function"):
         set_activation_function(get_param_as_string(filepath, "activation_function"))
+
+    if has_param(data, "res_net_skip_length"):
+        set_res_net_skip_length(get_param_as_int(filepath, "res_net_skip_length"))
     
     return
 

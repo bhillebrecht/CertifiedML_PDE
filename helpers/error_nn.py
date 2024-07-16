@@ -109,7 +109,7 @@ def train_error_nn(X_data=None, E_data=None, LOAD_WEIGHTS=True):
         export_csv(np.concatenate([X_data, E_data], axis=1), gen_data_path)
 
     error_nn.fit(X_data[:, :input_dim], E_data[:,0]+E_data[:,1], epochs, None, None, optimizer=get_optimizer(),learning_rate=0.1, val_freq=1000, log_freq=1000)
-    error_nn.save_weights(os.path.join(weights_path, 'easy_checkpoint'))
+    error_nn.save_weights(os.path.join(weights_path, 'easy_checkpoint.keras'))
 
 
 def load_function_error_training(filename= None):

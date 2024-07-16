@@ -6,7 +6,7 @@ The code provides a standard mean to use certified PINNs for your system, which 
 
 Before using the here published code, be aware that the code is published under MIT common license, as found in the LICENSE file enclosed. To quote this work in publications, refer to the CITATION file, therein we kindly ask to consider citing
 
-**B. Hillebrecht and B. Unger : "Certified machine learning: Rigorous a posteriori error bounds for PDE defined PINNs", arxiV preprint available**
+**Hillebrecht, B., & Unger, B. (2023). Rigorous a posteriori error bounds for PDE defined PINNs. IEEE Transactions on Neural Networks and Learning Systems, 1–11. https://doi.org/10.1109/TNNLS.2023.3335837**
 
 upon use of this code to generate published results. 
 
@@ -16,7 +16,7 @@ The parts of the presented code, which cover ODEs, have been presented previousl
 
 ## System Requirements
 
-Install python 3.9.x, tensorflow 2.7.0 is still incompatible to python 3.10.x.
+Install python 3.9.x, tensorflow 2.11.0 is still incompatible to python 3.10.x.
 Use pip to install all packages listed in requirements.txt
 ```
 pip install -r requirements.txt
@@ -31,23 +31,12 @@ The two examples which were published in the above mentioned application are inc
 ### Configuration Files
 
 Static configuration of the neural network and the training is done via .json files. One for the neural network in general
-- "config_nn.json" with parameters
-    - (uint, mandatory) input_dim : dimension of input, equals number of input neurons
-    - (uint, mandatory) output_dim : dimension of output, equals number of output neurons
-    - (uint, mandatory) num_layers : number of layers between input layer and output layer
-    - (uint, mandatory) num_neurons: number of neurons per layer between input and output layer
-    - (array, mandatory) lower_bound : array of lower limits on input parameter for collocation point generation and network configuration
-    - (array, mandatory) upper_bound : array of lower limits on input parameter for collocation point generation and network configuration
-    - (string, optional) activation_function: Activation function used for the neural network, valid values are tanh, silu, gelu and softmax
+- "config_nn.json" with parameters as listed in ./json_schema_input/conig_nn_schema.json
 
-and one for the training process
-- "config_training.json" with mandatory parameters
-    - (uint, mandatory) epochs : number of used training epochs
-    - (uint, mandatory) n_phys : number of used/generated collocation points for training
-    - (string, optional) optimizer: Optimizer used during training, valid values are adam and lbfgs
-    - (float, optional) learning_rate: Learning rate applied by the optimizer. By default, this is 0.1
-    - (uint, optional) validation_frequency: Validation frequency of the learning procedure, default is 1000
-    - (uint, optional) log_frequency: Logging frequency of the learning procedure, default is 1000
+and one for the training process steps
+- in case only one step is needed "config_training.json" with mandatory parameters as listed in ./json_schema_input/config_training_schema.json (i.e. set the parameter "$schema" in the json file accordingly)
+- multistep configurations "config_training.json" are required to fulfill ./json_schema_input/config_training_multistep_schema.json (i.e. set the parameter "$schema" in the json file accordingly)
+
 
 ### Command Line Configuration
 

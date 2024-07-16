@@ -181,7 +181,7 @@ def eval_pinn(create_fun, load_fun, input_file, appl_path, epsilon, eet, callout
     :param function callout: callout to be called after evaluating the PINN    
     """
     # Load  nn parameters
-    input_dim, output_dim, N_layer, N_neurons, lb, ub, = load_nn_params(os.path.join(appl_path,'config_nn.json'))
+    input_dim, output_dim, N_layer, N_neurons, lb, ub = load_nn_params(os.path.join(appl_path,'config_nn.json'))
     load_and_store_optional_nn_params(os.path.join(appl_path,'config_nn.json'))
 
     # load error estimation parameters

@@ -60,14 +60,17 @@ import time
 import datetime
 
 from pathlib import Path
+
+import keras
 from base.bc_layer import AddOffsetLayer, BoundaryCondition, LengthFactor, MultiplyLengthFactor
-from helpers.globals import get_activation_function
+from helpers.globals import get_activation_function, get_res_net_skip_length
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
 from base.lbfgs import LBFGS
+from base.lbfgs_probability import LBFGS_PROBABILITY
 
 from base.periodicity_layers import NonPeriodic_Base, Periodic_Base, PeriodicLayers
 
@@ -119,8 +122,8 @@ class NN(object, metaclass=abc.ABCMeta):
         self.w_data = 0
 
     def get_model(self, periodicity, lb, ub, bcs: BoundaryCondition, normalize=True):
-        res_net = True
-        skip_param = 3
+        skip_param = get_res_net_skip_length()
+        res_net = (skip_param != 0)
 
         # use the functional API 
         inputlayer = layers.Input((self.input_dim,), dtype='float64')
@@ -294,6 +297,8 @@ class NN(object, metaclass=abc.ABCMeta):
             self.train_adam(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, store_freq, verbose)
         elif optimizer == 'lbfgs':
             self.train_lbfgs(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, store_freq, verbose)
+        elif optimizer == 'lbfgs_tf_probability':
+            self.train_lbfgs_probability(x, y, epochs, x_test, y_test, learning_rate, val_freq, log_freq, store_freq, verbose)
 
         if load_best_weights is True:
             self.load_weights()
@@ -345,6 +350,28 @@ class NN(object, metaclass=abc.ABCMeta):
             self.model, self.loss_object, x, y, self.epoch_callback, epochs, x_test=x_test, y_test=y_test,
             val_freq=val_freq, log_freq=log_freq, store_freq=store_freq, verbose=verbose, learning_rate=learning_rate)
 
+    def train_lbfgs_probability(self, x, y, epochs=2000, x_test=None, y_test=None, learning_rate=1.0, val_freq=1000, log_freq=1000,
+                    store_freq=5000, verbose=1):
+        """
+        Performs the neural network training, using the L-BFGS optimizer.
+
+        :param tf.tensor x: input tensor of the training dataset
+        :param tf.tensor y: output tensor of the training dataset
+        :param int epochs: number of training epochs
+        :param tf.tensor x_test: input tensor of the test dataset, used to evaluate accuracy
+        :param tf.tensor y_test: output tensor of the test dataset, used to evaluate accuracy
+        """
+
+        # train the model with L-BFGS solver
+        if verbose:
+            logging.info(f'Start L-BFGS optimization')
+
+        optimizer = LBFGS_PROBABILITY()
+        optimizer.minimize(
+            self.model, self.loss_object, x, y, self.epoch_callback, epochs, x_test=x_test, y_test=y_test,
+            val_freq=val_freq, log_freq=log_freq, store_freq=store_freq, verbose=verbose, learning_rate=learning_rate)
+
+
     def predict(self, x):
         """
         Calls the model prediction function and returns the prediction on an input tensor.
@@ -389,22 +416,22 @@ class NN(object, metaclass=abc.ABCMeta):
 
         :param str path: path where the weights are saved
         """
-        Path(path).mkdir(parents=True, exist_ok=True)
+        folderpath = os.path.split(path)
+        Path(folderpath[0]).mkdir(parents=True, exist_ok=True)
         self.model.save_weights(path)
 
-    def load_weights(self, path=None):
+    def load_weights(self, pathname=None):
         """
         Loads the model weights from a specified path.
 
         :param str path: path where the weights are saved,
         if None the weights are assumed to be saved at the checkpoints directory
         """
+        if pathname is None:
+            pathname = os.path.join(self.checkpoints_dir, "easy_checkpoint.weights.h5")
 
-        if path is None:
-            path = self.checkpoints_dir
-
-        self.model.load_weights(tf.train.latest_checkpoint(path))
-        logging.info(f'\tWeights loaded from {path}')
+        self.model.load_weights(pathname)
+        logging.info(f'\tModel loaded from {pathname}')
         
     def get_epoch_duration(self):
         """
@@ -448,15 +475,15 @@ class NN(object, metaclass=abc.ABCMeta):
         if epoch % val_freq == 0 or epoch % log_freq == 0 or epoch == 1:
             length = len(str(epochs))
 
+
+            log_str = f'\tEpoch: {str(epoch).zfill(length)}/{epochs},\t' \
+                      f'Loss: {epoch_loss:.4e}'
             if epoch > val_freq:
                 rel_improv = 100*(1-epoch_loss/self.train_loss_results[epoch-val_freq])
+                log_str += f', \t Rel.Improv [%]: {rel_improv:.2f}'
             elif epoch == val_freq:
                 rel_improv = 100*(1-epoch_loss/self.train_loss_results[1])
-            else:
-                rel_improv = -1
-                
-            log_str = f'\tEpoch: {str(epoch).zfill(length)}/{epochs},\t' \
-                      f'Loss: {epoch_loss:.4e}, \t Rel.Improv [%]: {rel_improv:.2f}'
+                log_str += f', \t Rel.Improv [%]: {rel_improv:.2f}'
 
             if (epoch % val_freq == 0 or epoch == 1 ) and (x_val is not None and y_val is not None):
                 [mean_squared_error, errors, Y_pred] = self.evaluate(x_val, y_val)
@@ -464,19 +491,18 @@ class NN(object, metaclass=abc.ABCMeta):
                 self.train_pred_results[epoch] = Y_pred
                 log_str += f',\tAccuracy (MSE): {mean_squared_error:.4e}'
                 if mean_squared_error <= min(self.train_accuracy_results.values()):
-                    self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint'))
+                    self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint.weights.h5'))
 
             if (epoch % log_freq == 0 or epoch == 1) and verbose == 1:
                 log_str += f',\t Elapsed time: {elapsed_time} (+{self.get_epoch_duration()})'
                 logging.info(log_str)
 
             if epoch % store_freq == 0:
-                self.save_weights(os.path.join(self.checkpoints_dir, "epoch_"+str(epoch), 'easy_checkpoint'))            
+                self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint_'+str(epoch)+'.weights.h5'))            
                 logging.info(f'Store current weights')
 
-
         if epoch == epochs and x_val is None and y_val is None:
-            self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint'))
+            self.save_weights(os.path.join(self.checkpoints_dir, 'easy_checkpoint.weights.h5'))
 
     def evaluate(self, x_val, y_val, metric='MSE'):
         """
